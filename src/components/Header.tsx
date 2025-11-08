@@ -1,10 +1,11 @@
-// Server component: can safely read session with auth()
-import { auth } from "@/auth";
+// src/components/Header.tsx (server component)
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/auth";
 import Link from "next/link";
 import { AuthButtons } from "./AuthButtons";
 
 export default async function Header() {
-  const session = await auth();
+  const session = await getServerSession(authOptions);
   const email = session?.user?.email;
 
   return (

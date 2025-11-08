@@ -1,51 +1,44 @@
-// src/auth.ts
-import NextAuth, { type NextAuthConfig } from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
+// src/auth.ts (v4)
+import NextAuth, { type NextAuthOptions } from "next-auth";
 import EmailProvider from "next-auth/providers/email";
+import { PrismaAdapter } from "@next-auth/prisma-adapter";
+import { prisma } from "@/lib/prisma";
 import { Resend } from "resend";
 
-const prisma = new PrismaClient();
-const resend = new Resend(process.env.RESEND_API_KEY!);
+const resendKey = process.env.RESEND_API_KEY;
+const fromEmail = process.env.EMAIL_FROM;
 
-export const authConfig: NextAuthConfig = {
+export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   adapter: PrismaAdapter(prisma),
   providers: [
     EmailProvider({
-      from: process.env.EMAIL_FROM,
-      maxAge: 24 * 60 * 60, // 24h
+      from: fromEmail,
+      maxAge: 24 * 60 * 60,
       async sendVerificationRequest({ identifier, url }) {
-        // Custom email via Resend
-        await resend.emails.send({
-          from: process.env.EMAIL_FROM!,
-          to: identifier,
-          subject: "Your sign-in link",
-          html: `
-            <div style="font-family: sans-serif">
-              <p>Click to sign in:</p>
-              <p><a href="${url}">${url}</a></p>
-              <p>This link expires in 24 hours.</p>
-            </div>
-          `,
-        });
+        if (resendKey && fromEmail) {
+          const resend = new Resend(resendKey);
+          await resend.emails.send({
+            from: fromEmail!,
+            to: identifier,
+            subject: "Your sign-in link",
+            html: `<p>Click to sign in:</p><p><a href="${url}">${url}</a></p>`,
+          });
+        } else {
+          console.log("[DEV ONLY] Magic link for", identifier, "→", url);
+        }
       },
     }),
   ],
-  trustHost: true,
   secret: process.env.AUTH_SECRET,
-  // You can customize callbacks if you want user fields in the JWT:
+  trustHost: true,
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) token.userId = user.id;
-      return token;
-    },
-    async session({ session, token }) {
-      if (token?.userId) (session as any).userId = token.userId;
-      return session;
-    },
+    async jwt({ token, user }) { if (user) (token as any).userId = (user as any).id; return token; },
+    async session({ session, token }) { if (token && (token as any).userId) (session as any).userId = (token as any).userId; return session; },
   },
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(authConfig);
+// Build a handler for the App Router route file to re-export
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
 

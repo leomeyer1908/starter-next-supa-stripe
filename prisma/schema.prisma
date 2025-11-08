@@ -18,6 +18,11 @@ model User {
   // App fields (add your own later)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  // Stripe
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String?
+  stripePriceId        String?
+  planStatus           String? // 'active' | 'past_due' | 'canceled' | etc.
 }
 
 model Account {
