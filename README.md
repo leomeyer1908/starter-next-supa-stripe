@@ -69,6 +69,62 @@ Trigger a test:
 stripe trigger checkout.session.completed
 ```
 
+## Stripe: Local Test & Billing Portal Checklist
+
+> Use Stripe **Test mode** for everything below.
+
+### 1) Env vars
+Set these in `.env.local` (copy from `.env.example`):
+- `STRIPE_SECRET_KEY`
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_STRIPE_PRICE_ID`
+- `STRIPE_WEBHOOK_SECRET` (filled in step 3)
+- *(optional)* `STRIPE_PORTAL_CONFIGURATION_ID` — if you save a named Portal config
+
+### 2) Configure the Customer Portal (once, in Test mode)
+Dashboard → **Settings → Billing → Customer portal** → **Configure / Save**.
+Select features (update card, cancel sub, invoices), set **Return URL** to `http://localhost:3000`.
+Copy the **Configuration ID** (e.g. `pc_123…`) if you want to pin it via `STRIPE_PORTAL_CONFIGURATION_ID`.
+
+### 3) Start the webhook listener
+Run this in a separate terminal:
+```bash
+stripe listen --latest --forward-to http://127.0.0.1:3000/api/webhook
+Copy the printed signing secret and set:
+
+# .env.local
+STRIPE_WEBHOOK_SECRET=whsec_...
+Restart npm run dev after changing envs.
+
+4) Run the app
+npm run dev
+5) Test checkout (subscription)
+Visit /signin, enter any email (magic link via Resend or local dev fallback).
+
+Go to /subscribe and click Start Checkout.
+
+Complete payment on Stripe (test card 4242 4242 4242 4242, any future expiry, any CVC).
+
+You’ll be redirected to /success?session_id=….
+
+6) Test Billing Portal
+Go to /protected and click Manage billing → you should land in Stripe’s portal for the signed-in email (update card, cancel, invoices).
+
+7) CLI trigger (optional)
+You can simulate a successful checkout without the UI:
+
+stripe trigger checkout.session.completed
+Notes & Troubleshooting
+“No configuration provided…” → Save the Customer Portal settings in Test mode (step 2).
+
+Webhook “connection refused” → Use http://127.0.0.1:3000 (not localhost), ensure npm run dev is running on port 3000.
+
+Portal says “No billing profile yet” → The signed-in email must have at least one Stripe Customer (complete checkout once with that email).
+
+Checkout uses a 303 redirect from /api/checkout; /subscribe requires sign-in and prefills your email on Stripe.
+
+makefile
+
 ---
 
 ## 🔧 Scripts
